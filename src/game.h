@@ -17,6 +17,8 @@ typedef struct Game {
     int dx, dy, next_dx, next_dy;
     int64_t last_move, flash_until, collision_time;
     bool game_over;
+    bool paused, pause_key_down;
+    int64_t paused_at;
 } Game;
 
 typedef enum GameResult {

@@ -16,6 +16,20 @@ bool game_init(Game *game, int64_t now) {
 }
 
 GameResult game_update(Game *game, const int keys[256], int64_t now) {
+    if (keys['P'] && !game->pause_key_down) {
+        game->paused = !game->paused;
+        if (game->paused) {
+            game->paused_at = now;
+        } else {
+            int64_t duration = now > game->paused_at ? now - game->paused_at : 0;
+            game->last_move += duration;
+            if (game->flash_until > game->paused_at) game->flash_until += duration;
+            if (game->game_over) game->collision_time += duration;
+        }
+    }
+    game->pause_key_down = !!keys['P'];
+    if (game->paused) return GAME_RUNNING;
+
     if (game->game_over) {
         if (now - game->collision_time >= COLLISION_FLASHES * 2 * COLLISION_FLASH_MS)
             return GAME_FINISHED;
@@ -46,6 +60,7 @@ GameResult game_update(Game *game, const int keys[256], int64_t now) {
 }
 
 void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
+    if (game->paused) now = game->paused_at;
     int64_t collision_elapsed = now - game->collision_time;
     bool collision_red = game->game_over && (collision_elapsed / COLLISION_FLASH_MS) % 2 == 0;
     draw_rectangle(canvas, 0, 0, WIDTH, HEIGHT,
@@ -55,7 +70,11 @@ void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
         snake_draw(game->head, canvas, CELL_SIZE);
         draw_rectangle(canvas, 0, GRID_HEIGHT * CELL_SIZE, WIDTH,
                        HEIGHT - GRID_HEIGHT * CELL_SIZE, 0x3d5675);
-        font_draw_text(canvas, 2, GRID_HEIGHT * CELL_SIZE + 1, "SNAKE", 0xffffff);
+        const char *controls = game->paused ? "P: RESUME Q: QUIT" : "P: PAUSE Q: QUIT";
+        int length = 0;
+        while (controls[length] != '\0') ++length;
+        font_draw_text(canvas, WIDTH - FONT_ADVANCE - length * FONT_ADVANCE,
+                       GRID_HEIGHT * CELL_SIZE + 1, controls, 0xffffff);
     }
 }
 

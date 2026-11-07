@@ -25,7 +25,7 @@ int main(void) {
     }
 
     int exit_code = 0;
-    while (fenster_loop(&window) == 0 && !window.keys[27]) {
+    while (fenster_loop(&window) == 0 && !window.keys[27] && !window.keys['Q']) {
         int64_t start = fenster_time();
         GameResult result = game_update(&game, window.keys, start);
         if (result != GAME_RUNNING) {
