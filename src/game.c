@@ -3,10 +3,11 @@
 #include "font.h"
 #include <stdio.h>
 
-enum { MOVE_MS = 30, FLASH_MS = 60, COLLISION_FLASH_MS = 180, COLLISION_FLASHES = 3 };
+enum { INITIAL_MOVE_MS = 70, MIN_MOVE_MS = 30, FLASH_MS = 60,
+       COLLISION_FLASH_MS = 180, COLLISION_FLASHES = 3 };
 
 bool game_init(Game *game, int64_t now) {
-    *game = (Game){ .dx = 1, .next_dx = 1, .last_move = now };
+    *game = (Game){ .dx = 1, .next_dx = 1, .last_move = now, .move_ms = INITIAL_MOVE_MS };
     game->head = snake_create(BODY_SEGMENTS, GRID_WIDTH, GRID_HEIGHT);
     if (game->head == NULL) return false;
     food_spawn(&game->food, game->head, GRID_WIDTH, GRID_HEIGHT);
@@ -19,6 +20,10 @@ bool game_restart(Game *game, int64_t now) {
     game_destroy(game);
     *game = restarted;
     return true;
+}
+
+unsigned int game_food_score(const Game *game) {
+    return (unsigned int)(INITIAL_MOVE_MS - game->move_ms);
 }
 
 GameResult game_update(Game *game, const int keys[256], int64_t now) {
@@ -49,7 +54,7 @@ GameResult game_update(Game *game, const int keys[256], int64_t now) {
     else if (keys[20] && game->dx != 1) { game->next_dx = -1; game->next_dy = 0; }
 
     if (now < game->last_move) game->last_move = now;
-    if (now - game->last_move >= MOVE_MS) {
+    if (now - game->last_move >= game->move_ms) {
         game->dx = game->next_dx;
         game->dy = game->next_dy;
         if (snake_would_collide(game->head, game->dx, game->dy, GRID_WIDTH, GRID_HEIGHT)) {
@@ -59,7 +64,8 @@ GameResult game_update(Game *game, const int keys[256], int64_t now) {
             int ate = snake_move(&game->food, &game->head, game->dx, game->dy, GRID_WIDTH, GRID_HEIGHT);
             if (ate < 0) return GAME_ERROR;
             if (ate) {
-                ++game->score;
+                if (game->move_ms > MIN_MOVE_MS) --game->move_ms;
+                game->score += game_food_score(game);
                 game->flash_until = now + FLASH_MS;
             }
         }
