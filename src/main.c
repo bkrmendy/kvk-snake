@@ -14,17 +14,6 @@ enum {
 };
 static uint32_t pixels[WIDTH * SCALE * HEIGHT * SCALE];
 
-static void rectangle(int x, int y, int w, int h, uint32_t color) {
-    for (int py = y; py < y + h; ++py) {
-        for (int px = x; px < x + w; ++px) {
-            if (px < 0 || px >= WIDTH || py < 0 || py >= HEIGHT) continue;
-            for (int sy = 0; sy < SCALE; ++sy)
-                for (int sx = 0; sx < SCALE; ++sx)
-                    pixels[(py * SCALE + sy) * (WIDTH * SCALE) + px * SCALE + sx] = color;
-        }
-    }
-}
-
 int main(void) {
     struct fenster window = {
         .title = "Pixel Game", .width = WIDTH * SCALE,
@@ -35,26 +24,12 @@ int main(void) {
         return 1;
     }
 
-    GridCell *head = NULL;
-    /* Build from tail to head so each node can later be freed independently. */
-    for (int i = BODY_SEGMENTS; i >= 0; --i) {
-        GridCell *segment = malloc(sizeof *segment);
-        if (segment == NULL) {
-            fputs("Could not allocate snake segment.\n", stderr);
-            while (head != NULL) {
-                GridCell *next = head->next;
-                free(head);
-                head = next;
-            }
-            fenster_close(&window);
-            return 1;
-        }
-        *segment = (GridCell){
-            .x = (GRID_WIDTH / 2 - i + GRID_WIDTH) % GRID_WIDTH,
-            .y = GRID_HEIGHT / 2,
-            .next = head
-        };
-        head = segment;
+    Canvas canvas = { .pixels = pixels, .width = WIDTH, .height = HEIGHT, .scale = SCALE };
+    GridCell *head = snake_create(BODY_SEGMENTS, GRID_WIDTH, GRID_HEIGHT);
+    if (head == NULL) {
+        fputs("Could not allocate snake segment.\n", stderr);
+        fenster_close(&window);
+        return 1;
     }
     srand((unsigned)time(NULL));
     Food food = {0};
@@ -81,7 +56,7 @@ int main(void) {
                 game_over = true;
                 collision_time = start;
             } else {
-                int ate = food_move_snake(&food, &head, dx, dy, GRID_WIDTH, GRID_HEIGHT);
+                int ate = snake_move(&food, &head, dx, dy, GRID_WIDTH, GRID_HEIGHT);
                 if (ate < 0) {
                     fputs("Could not grow snake.\n", stderr);
                     exit_code = 1;
@@ -97,27 +72,17 @@ int main(void) {
             break;
         }
         bool collision_red = game_over && (collision_elapsed / COLLISION_FLASH_MS) % 2 == 0;
-        rectangle(0, 0, WIDTH, HEIGHT,
+        draw_rectangle(&canvas, 0, 0, WIDTH, HEIGHT,
                   collision_red || (!game_over && start < flash_until) ? 0xa52332 : 0x19243a);
         if (!collision_red) {
-            if (food.active) {
-                rectangle(food.x * CELL_SIZE, food.y * CELL_SIZE,
-                          CELL_SIZE, CELL_SIZE, 0x65d46e);
-            }
-            for (GridCell *segment = head; segment != NULL; segment = segment->next) {
-                rectangle(segment->x * CELL_SIZE, segment->y * CELL_SIZE,
-                          CELL_SIZE, CELL_SIZE, 0xffd166);
-            }
+            food_draw(&food, &canvas, CELL_SIZE);
+            snake_draw(head, &canvas, CELL_SIZE);
         }
 
         int64_t elapsed = fenster_time() - start;
         if (elapsed >= 0 && elapsed < FRAME_MS) fenster_sleep(FRAME_MS - elapsed);
     }
-    while (head != NULL) {
-        GridCell *next = head->next;
-        free(head);
-        head = next;
-    }
+    snake_destroy(head);
     fenster_close(&window);
     return exit_code;
 }

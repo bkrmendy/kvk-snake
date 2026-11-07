@@ -26,28 +26,9 @@ void food_spawn(Food *food, const GridCell *snake, int width, int height) {
     }
 }
 
-int food_move_snake(Food *food, GridCell **head, int dx, int dy, int width, int height) {
-    int x = ((*head)->x + dx + width) % width;
-    int y = ((*head)->y + dy + height) % height;
-    if (food->active && food->x == x && food->y == y) {
-        /* The new head is inserted in O(1); the old head becomes the first body segment. */
-        GridCell *new_head = malloc(sizeof *new_head);
-        if (new_head == NULL) return -1;
-        *new_head = (GridCell){ .x = x, .y = y, .next = *head };
-        *head = new_head;
-        food_spawn(food, *head, width, height);
-        return 1;
+void food_draw(const Food *food, const Canvas *canvas, int cell_size) {
+    if (food->active) {
+        draw_rectangle(canvas, food->x * cell_size, food->y * cell_size,
+                       cell_size, cell_size, 0x65d46e);
     }
-
-    int previous_x = (*head)->x, previous_y = (*head)->y;
-    (*head)->x = x;
-    (*head)->y = y;
-    for (GridCell *segment = (*head)->next; segment != NULL; segment = segment->next) {
-        int old_x = segment->x, old_y = segment->y;
-        segment->x = previous_x;
-        segment->y = previous_y;
-        previous_x = old_x;
-        previous_y = old_y;
-    }
-    return 0;
 }
