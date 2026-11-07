@@ -2,7 +2,7 @@
 ifeq ($(origin CC), default)
 CC := gcc
 endif
-CPPFLAGS += -Ivendor/fenster
+CPPFLAGS += -Ivendor/fenster -D_POSIX_C_SOURCE=200809L
 CFLAGS ?= -std=c11 -Wall -Wextra -g -O0
 BUILD_DIR := build
 TARGET := $(BUILD_DIR)/pixel-game
