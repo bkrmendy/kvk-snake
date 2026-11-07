@@ -13,6 +13,6 @@ bool snake_would_collide(const GridCell *head, int dx, int dy, int width, int he
 
 /* Return 1 if food was eaten, 0 for a normal move, or -1 on allocation failure. */
 int snake_move(Food *food, GridCell **head, int dx, int dy, int width, int height);
-void snake_draw(const GridCell *head, const Canvas *canvas, int cell_size);
+void snake_draw(const GridCell *head, const Canvas *canvas, int cell_size, bool flash);
 
 #endif

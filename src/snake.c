@@ -63,9 +63,9 @@ int snake_move(Food *food, GridCell **head, int dx, int dy, int width, int heigh
     return 0;
 }
 
-void snake_draw(const GridCell *head, const Canvas *canvas, int cell_size) {
+void snake_draw(const GridCell *head, const Canvas *canvas, int cell_size, bool flash) {
     for (const GridCell *segment = head; segment != NULL; segment = segment->next) {
         draw_rectangle(canvas, segment->x * cell_size, segment->y * cell_size,
-                       cell_size, cell_size, 0xffd166);
+                       cell_size, cell_size, flash ? 0xa52332 : 0xffd166);
     }
 }

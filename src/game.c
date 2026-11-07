@@ -80,11 +80,10 @@ void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
     bool collision_red = game->game_over && collision_elapsed >= 0 &&
                          collision_elapsed < COLLISION_FLASHES * 2 * COLLISION_FLASH_MS &&
                          (collision_elapsed / COLLISION_FLASH_MS) % 2 == 0;
-    draw_rectangle(canvas, 0, 0, WIDTH, HEIGHT,
-                   collision_red || (!game->game_over && now < game->flash_until) ? 0xa52332 : 0x19243a);
+    draw_rectangle(canvas, 0, 0, WIDTH, HEIGHT, collision_red ? 0xa52332 : 0x19243a);
     if (!collision_red) {
         food_draw(&game->food, canvas, CELL_SIZE);
-        snake_draw(game->head, canvas, CELL_SIZE);
+        snake_draw(game->head, canvas, CELL_SIZE, !game->game_over && now < game->flash_until);
         draw_rectangle(canvas, 0, GRID_HEIGHT * CELL_SIZE, WIDTH,
                        HEIGHT - GRID_HEIGHT * CELL_SIZE, 0x3d5675);
         char score_label[32];
