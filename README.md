@@ -1,6 +1,6 @@
 # Pixel Game
 
-A small C11 pixel-game starting point using [Fenster](https://github.com/zserge/fenster) for the window, framebuffer, input and timing. The example draws at 160 × 120 and scales each pixel 4×. Move the square with WASD or the arrow keys; press Escape to quit.
+A small C11 pixel-game starting point using [Fenster](https://github.com/zserge/fenster) for the window, framebuffer, input and timing. The example draws at 160 × 120 and scales each pixel 4×. Use the arrow keys to steer the snake; press Escape to quit. The snake wraps around the edges, and direct reversals are ignored. Change `BODY_SEGMENTS` in `src/main.c` to adjust its initial length (the head is separate).
 
 ## Requirements
 
