@@ -17,7 +17,7 @@ typedef struct Game {
     unsigned int score;
     int move_ms;
     int64_t last_move, flash_until, collision_time;
-    bool game_over;
+    bool game_over, score_recorded;
     bool paused, pause_key_down;
     int64_t paused_at;
 } Game;

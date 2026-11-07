@@ -6,6 +6,8 @@
 enum { INITIAL_MOVE_MS = 70, MIN_MOVE_MS = 30, FLASH_MS = 60,
        COLLISION_FLASH_MS = 180, COLLISION_FLASHES = 3 };
 
+static const char HIGHSCORE_FILE[] = "snake_highscores.txt";
+
 /* Fenster maps the arrow keys to these indexes. */
 enum { KEY_UP = 17, KEY_DOWN = 18, KEY_RIGHT = 19, KEY_LEFT = 20 };
 
@@ -30,6 +32,20 @@ bool game_restart(Game *game, int64_t now) {
 
 static unsigned int game_food_score(const Game *game) {
     return (unsigned int)(INITIAL_MOVE_MS - game->move_ms);
+}
+
+static void highscore_system(Game *game) {
+    if (!game->game_over || game->score_recorded) return;
+    game->score_recorded = true;
+
+    FILE *file = fopen(HIGHSCORE_FILE, "a");
+    if (!file) {
+        fprintf(stderr, "Could not write %s.\n", HIGHSCORE_FILE);
+        return;
+    }
+    bool failed = fprintf(file, "%u\n", game->score) < 0;
+    if (fclose(file) != 0) failed = true;
+    if (failed) fprintf(stderr, "Could not write %s.\n", HIGHSCORE_FILE);
 }
 
 typedef enum StateResult { STATE_ERROR, STATE_STOP, STATE_CONTINUE } StateResult;
@@ -91,11 +107,14 @@ static GameResult snake_movement_system(Game *game, int64_t now) {
 }
 
 GameResult game_update(Game *game, const int keys[256], int64_t now) {
+    highscore_system(game);
     StateResult state = game_state_system(game, keys, now);
     if (state == STATE_ERROR) return GAME_ERROR;
     if (state == STATE_STOP) return GAME_RUNNING;
     snake_input_system(&game->snake, keys);
-    return snake_movement_system(game, now);
+    GameResult result = snake_movement_system(game, now);
+    highscore_system(game);
+    return result;
 }
 
 void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
