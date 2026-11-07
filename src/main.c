@@ -6,43 +6,61 @@
 #include "fenster.h"
 
 enum { FRAME_MS = 16 };
-static uint32_t pixels[WIDTH * SCALE * HEIGHT * SCALE];
 
-int main(void) {
-    struct fenster window = {
-        .title = "Pixel Game", .width = WIDTH * SCALE,
-        .height = HEIGHT * SCALE, .buf = pixels
-    };
-    if (fenster_open(&window) != 0) {
-        fputs("Could not open the game window.\n", stderr);
-        return 1;
-    }
-
-    Canvas canvas = { .pixels = pixels, .width = WIDTH, .height = HEIGHT, .scale = SCALE };
+typedef struct App {
+    struct fenster window;
+    Canvas canvas;
     Game game;
+    uint32_t pixels[WIDTH * SCALE * HEIGHT * SCALE];
+} App;
+
+static App app = {
+    .window = { .title = "Pixel Game", .width = WIDTH * SCALE, .height = HEIGHT * SCALE }
+};
+
+static void time_init(void) {
     srand((unsigned)time(NULL));
-    if (!game_init(&game, fenster_time())) {
-        fputs("Could not initialize snake (invalid configuration or allocation failure).\n", stderr);
-        fenster_close(&window);
-        return 1;
+}
+
+static bool app_init(App *app) {
+    app->window.buf = app->pixels;
+    if (fenster_open(&app->window) != 0) {
+        fputs("Could not open the game window.\n", stderr);
+        return false;
     }
 
-    int exit_code = 0;
-    while (fenster_loop(&window) == 0 && !window.keys[27] && !window.keys['Q']) {
+    app->canvas = (Canvas){ .pixels = app->pixels, .width = WIDTH, .height = HEIGHT, .scale = SCALE };
+    time_init();
+    if (!game_init(&app->game, fenster_time())) {
+        fputs("Could not initialize snake (invalid configuration or allocation failure).\n", stderr);
+        fenster_close(&app->window);
+        return false;
+    }
+    return true;
+}
+
+static int app_run(App *app) {
+    while (fenster_loop(&app->window) == 0 && !app->window.keys[27] && !app->window.keys['Q']) {
         int64_t start = fenster_time();
-        GameResult result = game_update(&game, window.keys, start);
-        if (result != GAME_RUNNING) {
-            if (result == GAME_ERROR) {
-                fputs("Could not grow snake.\n", stderr);
-                exit_code = 1;
-            }
-            break;
+        if (game_update(&app->game, app->window.keys, start) == GAME_ERROR) {
+            fputs("Could not grow snake.\n", stderr);
+            return 1;
         }
-        game_draw(&game, &canvas, start);
+        game_draw(&app->game, &app->canvas, start);
         int64_t elapsed = fenster_time() - start;
         if (elapsed >= 0 && elapsed < FRAME_MS) fenster_sleep(FRAME_MS - elapsed);
     }
-    game_destroy(&game);
-    fenster_close(&window);
-    return exit_code;
+    return 0;
+}
+
+static void app_destroy(App *app) {
+    game_destroy(&app->game);
+    fenster_close(&app->window);
+}
+
+int main(void) {
+    if (!app_init(&app)) return 1;
+    int result = app_run(&app);
+    app_destroy(&app);
+    return result;
 }

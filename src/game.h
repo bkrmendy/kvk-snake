@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "food.h"
+#include "snake.h"
 
 enum {
     WIDTH = 160, HEIGHT = 120, SCALE = 4,
@@ -12,11 +12,10 @@ enum {
 };
 
 typedef struct Game {
-    GridCell *head;
+    Snake snake;
     Food food;
     unsigned int score;
     int move_ms;
-    int dx, dy, next_dx, next_dy;
     int64_t last_move, flash_until, collision_time;
     bool game_over;
     bool paused, pause_key_down;

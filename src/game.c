@@ -10,10 +10,9 @@ enum { INITIAL_MOVE_MS = 70, MIN_MOVE_MS = 30, FLASH_MS = 60,
 enum { KEY_UP = 17, KEY_DOWN = 18, KEY_RIGHT = 19, KEY_LEFT = 20 };
 
 bool game_init(Game *game, int64_t now) {
-    *game = (Game){ .dx = 1, .next_dx = 1, .last_move = now, .move_ms = INITIAL_MOVE_MS };
-    game->head = snake_create(BODY_SEGMENTS, GRID_WIDTH, GRID_HEIGHT);
-    if (game->head == NULL) return false;
-    food_spawn(&game->food, game->head, GRID_WIDTH, GRID_HEIGHT);
+    *game = (Game){ .last_move = now, .move_ms = INITIAL_MOVE_MS };
+    if (!snake_create(&game->snake, BODY_SEGMENTS, GRID_WIDTH, GRID_HEIGHT)) return false;
+    food_spawn(&game->food, game->snake.head, GRID_WIDTH, GRID_HEIGHT);
     if (!game->food.active) {
         game->game_over = true;
         game->collision_time = now;
@@ -33,13 +32,15 @@ static unsigned int game_food_score(const Game *game) {
     return (unsigned int)(INITIAL_MOVE_MS - game->move_ms);
 }
 
-GameResult game_update(Game *game, const int keys[256], int64_t now) {
+typedef enum StateResult { STATE_ERROR, STATE_STOP, STATE_CONTINUE } StateResult;
+
+static StateResult game_state_system(Game *game, const int keys[256], int64_t now) {
     if (game->game_over) {
         if (keys['R']) {
-            if (!game_restart(game, now)) return GAME_ERROR;
+            if (!game_restart(game, now)) return STATE_ERROR;
             game->pause_key_down = !!keys['P'];
         }
-        return GAME_RUNNING;
+        return STATE_STOP;
     }
     if (keys['P'] && !game->pause_key_down) {
         game->paused = !game->paused;
@@ -52,23 +53,27 @@ GameResult game_update(Game *game, const int keys[256], int64_t now) {
         }
     }
     game->pause_key_down = !!keys['P'];
-    if (game->paused) return GAME_RUNNING;
+    return game->paused ? STATE_STOP : STATE_CONTINUE;
+}
 
+static void snake_input_system(Snake *snake, const int keys[256]) {
     /* Ignore direct reversals so the head cannot turn into its neck. */
-    if (keys[KEY_UP] && game->dy != 1) { game->next_dx = 0; game->next_dy = -1; }
-    else if (keys[KEY_DOWN] && game->dy != -1) { game->next_dx = 0; game->next_dy = 1; }
-    else if (keys[KEY_RIGHT] && game->dx != -1) { game->next_dx = 1; game->next_dy = 0; }
-    else if (keys[KEY_LEFT] && game->dx != 1) { game->next_dx = -1; game->next_dy = 0; }
+    if (keys[KEY_UP] && snake->dy != 1) { snake->next_dx = 0; snake->next_dy = -1; }
+    else if (keys[KEY_DOWN] && snake->dy != -1) { snake->next_dx = 0; snake->next_dy = 1; }
+    else if (keys[KEY_RIGHT] && snake->dx != -1) { snake->next_dx = 1; snake->next_dy = 0; }
+    else if (keys[KEY_LEFT] && snake->dx != 1) { snake->next_dx = -1; snake->next_dy = 0; }
+}
 
+static GameResult snake_movement_system(Game *game, int64_t now) {
     if (now < game->last_move) game->last_move = now;
     if (now - game->last_move >= game->move_ms) {
-        game->dx = game->next_dx;
-        game->dy = game->next_dy;
-        if (snake_would_collide(game->head, game->dx, game->dy, GRID_WIDTH, GRID_HEIGHT)) {
+        game->snake.dx = game->snake.next_dx;
+        game->snake.dy = game->snake.next_dy;
+        if (snake_would_collide(&game->snake, GRID_WIDTH, GRID_HEIGHT)) {
             game->game_over = true;
             game->collision_time = now;
         } else {
-            SnakeMoveResult move = snake_move(&game->food, &game->head, game->dx, game->dy, GRID_WIDTH, GRID_HEIGHT);
+            SnakeMoveResult move = snake_move(&game->snake, &game->food, GRID_WIDTH, GRID_HEIGHT);
             if (move == SNAKE_MOVE_ERROR) return GAME_ERROR;
             if (move == SNAKE_ATE) {
                 if (game->move_ms > MIN_MOVE_MS) --game->move_ms;
@@ -85,6 +90,14 @@ GameResult game_update(Game *game, const int keys[256], int64_t now) {
     return GAME_RUNNING;
 }
 
+GameResult game_update(Game *game, const int keys[256], int64_t now) {
+    StateResult state = game_state_system(game, keys, now);
+    if (state == STATE_ERROR) return GAME_ERROR;
+    if (state == STATE_STOP) return GAME_RUNNING;
+    snake_input_system(&game->snake, keys);
+    return snake_movement_system(game, now);
+}
+
 void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
     if (game->paused) now = game->paused_at;
     int64_t collision_elapsed = now - game->collision_time;
@@ -94,7 +107,7 @@ void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
     draw_rectangle(canvas, 0, 0, WIDTH, HEIGHT, collision_red ? COLOR_COLLISION : 0x19243a);
     if (!collision_red) {
         food_draw(&game->food, canvas, CELL_SIZE);
-        snake_draw(game->head, canvas, CELL_SIZE, !game->game_over && now < game->flash_until);
+        snake_draw(&game->snake, canvas, CELL_SIZE, !game->game_over && now < game->flash_until);
         draw_rectangle(canvas, 0, GRID_HEIGHT * CELL_SIZE, WIDTH,
                        HEIGHT - GRID_HEIGHT * CELL_SIZE, 0x3d5675);
         char score_label[32];
@@ -111,6 +124,5 @@ void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
 }
 
 void game_destroy(Game *game) {
-    snake_destroy(game->head);
-    game->head = NULL;
+    snake_destroy(&game->snake);
 }
