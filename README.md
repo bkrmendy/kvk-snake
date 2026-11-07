@@ -1,6 +1,6 @@
 # Pixel Game
 
-A small C11 pixel-game starting point using [Fenster](https://github.com/zserge/fenster) for the window, framebuffer, input and timing. The example draws at 160 × 120 and scales each pixel 4×. Use the arrow keys to steer the snake towards the green food, P to pause or resume, and Q to quit; eating makes it grow and briefly flashes the background red. The snake wraps around the edges, and direct reversals are ignored. Moving into any currently occupied body cell ends the game after three red flashes. Change `BODY_SEGMENTS` in `src/main.c` to adjust its initial length (the head is separate).
+A small C11 pixel-game starting point using [Fenster](https://github.com/zserge/fenster) for the window, framebuffer, input and timing. The example draws at 160 × 120 and scales each pixel 4×. Use the arrow keys to steer the snake towards the green food, P to pause or resume, and Q to quit; eating makes it grow and briefly flashes the background red. The snake wraps around the edges, and direct reversals are ignored. Moving into any currently occupied body cell ends the game with three red flashes; press R to restart. Change `BODY_SEGMENTS` in `src/main.c` to adjust its initial length (the head is separate).
 
 ## Requirements
 

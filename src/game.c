@@ -2,21 +2,33 @@
 #include "snake.h"
 #include "font.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
 
-enum { MOVE_MS = 60, FLASH_MS = 60, COLLISION_FLASH_MS = 180, COLLISION_FLASHES = 3 };
+enum { MOVE_MS = 30, FLASH_MS = 60, COLLISION_FLASH_MS = 180, COLLISION_FLASHES = 3 };
 
 bool game_init(Game *game, int64_t now) {
     *game = (Game){ .dx = 1, .next_dx = 1, .last_move = now };
     game->head = snake_create(BODY_SEGMENTS, GRID_WIDTH, GRID_HEIGHT);
     if (game->head == NULL) return false;
-    srand((unsigned)time(NULL));
     food_spawn(&game->food, game->head, GRID_WIDTH, GRID_HEIGHT);
     return true;
 }
 
+bool game_restart(Game *game, int64_t now) {
+    Game restarted;
+    if (!game_init(&restarted, now)) return false;
+    game_destroy(game);
+    *game = restarted;
+    return true;
+}
+
 GameResult game_update(Game *game, const int keys[256], int64_t now) {
+    if (game->game_over) {
+        if (keys['R']) {
+            if (!game_restart(game, now)) return GAME_ERROR;
+            game->pause_key_down = !!keys['P'];
+        }
+        return GAME_RUNNING;
+    }
     if (keys['P'] && !game->pause_key_down) {
         game->paused = !game->paused;
         if (game->paused) {
@@ -25,17 +37,10 @@ GameResult game_update(Game *game, const int keys[256], int64_t now) {
             int64_t duration = now > game->paused_at ? now - game->paused_at : 0;
             game->last_move += duration;
             if (game->flash_until > game->paused_at) game->flash_until += duration;
-            if (game->game_over) game->collision_time += duration;
         }
     }
     game->pause_key_down = !!keys['P'];
     if (game->paused) return GAME_RUNNING;
-
-    if (game->game_over) {
-        if (now - game->collision_time >= COLLISION_FLASHES * 2 * COLLISION_FLASH_MS)
-            return GAME_FINISHED;
-        return GAME_RUNNING;
-    }
 
     /* Ignore direct reversals so the head cannot turn into its neck. */
     if (keys[17] && game->dy != 1) { game->next_dx = 0; game->next_dy = -1; }
@@ -66,7 +71,9 @@ GameResult game_update(Game *game, const int keys[256], int64_t now) {
 void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
     if (game->paused) now = game->paused_at;
     int64_t collision_elapsed = now - game->collision_time;
-    bool collision_red = game->game_over && (collision_elapsed / COLLISION_FLASH_MS) % 2 == 0;
+    bool collision_red = game->game_over && collision_elapsed >= 0 &&
+                         collision_elapsed < COLLISION_FLASHES * 2 * COLLISION_FLASH_MS &&
+                         (collision_elapsed / COLLISION_FLASH_MS) % 2 == 0;
     draw_rectangle(canvas, 0, 0, WIDTH, HEIGHT,
                    collision_red || (!game->game_over && now < game->flash_until) ? 0xa52332 : 0x19243a);
     if (!collision_red) {
@@ -78,7 +85,8 @@ void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
         snprintf(score_label, sizeof score_label, "SCORE: %u", game->score);
         font_draw_text(canvas, FONT_ADVANCE, GRID_HEIGHT * CELL_SIZE + 1,
                        score_label, 0xffffff);
-        const char *controls = game->paused ? "P: RESUME Q: QUIT" : "P: PAUSE Q: QUIT";
+        const char *controls = game->game_over ? "R: RESTART Q: QUIT" :
+                               game->paused ? "P: RESUME Q: QUIT" : "P: PAUSE Q: QUIT";
         int length = 0;
         while (controls[length] != '\0') ++length;
         font_draw_text(canvas, WIDTH - FONT_ADVANCE - length * FONT_ADVANCE,

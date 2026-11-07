@@ -24,11 +24,11 @@ typedef struct Game {
 
 typedef enum GameResult {
     GAME_ERROR = -1,
-    GAME_RUNNING,
-    GAME_FINISHED
+    GAME_RUNNING
 } GameResult;
 
 bool game_init(Game *game, int64_t now);
+bool game_restart(Game *game, int64_t now);
 GameResult game_update(Game *game, const int keys[256], int64_t now);
 void game_draw(const Game *game, const Canvas *canvas, int64_t now);
 void game_destroy(Game *game);
