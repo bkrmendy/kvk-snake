@@ -1,6 +1,7 @@
 #include "game.h"
 #include "snake.h"
 #include "font.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -52,7 +53,10 @@ GameResult game_update(Game *game, const int keys[256], int64_t now) {
         } else {
             int ate = snake_move(&game->food, &game->head, game->dx, game->dy, GRID_WIDTH, GRID_HEIGHT);
             if (ate < 0) return GAME_ERROR;
-            if (ate) game->flash_until = now + FLASH_MS;
+            if (ate) {
+                ++game->score;
+                game->flash_until = now + FLASH_MS;
+            }
         }
         game->last_move = now;
     }
@@ -70,6 +74,10 @@ void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
         snake_draw(game->head, canvas, CELL_SIZE);
         draw_rectangle(canvas, 0, GRID_HEIGHT * CELL_SIZE, WIDTH,
                        HEIGHT - GRID_HEIGHT * CELL_SIZE, 0x3d5675);
+        char score_label[32];
+        snprintf(score_label, sizeof score_label, "SCORE: %u", game->score);
+        font_draw_text(canvas, FONT_ADVANCE, GRID_HEIGHT * CELL_SIZE + 1,
+                       score_label, 0xffffff);
         const char *controls = game->paused ? "P: RESUME Q: QUIT" : "P: PAUSE Q: QUIT";
         int length = 0;
         while (controls[length] != '\0') ++length;

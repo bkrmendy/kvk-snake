@@ -14,6 +14,7 @@ enum {
 typedef struct Game {
     GridCell *head;
     Food food;
+    unsigned int score;
     int dx, dy, next_dx, next_dy;
     int64_t last_move, flash_until, collision_time;
     bool game_over;
