@@ -11,6 +11,8 @@ void snake_destroy(GridCell *head) {
 }
 
 GridCell *snake_create(int body_segments, int width, int height) {
+    if (width <= 0 || height <= 0 || body_segments < 0 || body_segments >= width) return NULL;
+
     GridCell *head = NULL;
     for (int i = body_segments; i >= 0; --i) {
         GridCell *segment = malloc(sizeof *segment);
@@ -37,17 +39,17 @@ bool snake_would_collide(const GridCell *head, int dx, int dy, int width, int he
     return false;
 }
 
-int snake_move(Food *food, GridCell **head, int dx, int dy, int width, int height) {
+SnakeMoveResult snake_move(Food *food, GridCell **head, int dx, int dy, int width, int height) {
     int x = ((*head)->x + dx + width) % width;
     int y = ((*head)->y + dy + height) % height;
     if (food->active && food->x == x && food->y == y) {
         /* The new head is inserted in O(1); the old head becomes the first body segment. */
         GridCell *new_head = malloc(sizeof *new_head);
-        if (new_head == NULL) return -1;
+        if (new_head == NULL) return SNAKE_MOVE_ERROR;
         *new_head = (GridCell){ .x = x, .y = y, .next = *head };
         *head = new_head;
         food_spawn(food, *head, width, height);
-        return 1;
+        return SNAKE_ATE;
     }
 
     int previous_x = (*head)->x, previous_y = (*head)->y;
@@ -60,12 +62,12 @@ int snake_move(Food *food, GridCell **head, int dx, int dy, int width, int heigh
         previous_x = old_x;
         previous_y = old_y;
     }
-    return 0;
+    return SNAKE_MOVED;
 }
 
 void snake_draw(const GridCell *head, const Canvas *canvas, int cell_size, bool flash) {
     for (const GridCell *segment = head; segment != NULL; segment = segment->next) {
         draw_rectangle(canvas, segment->x * cell_size, segment->y * cell_size,
-                       cell_size, cell_size, flash ? 0xa52332 : 0xffd166);
+                       cell_size, cell_size, flash ? COLOR_COLLISION : 0xffd166);
     }
 }

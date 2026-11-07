@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+enum { COLOR_COLLISION = 0xa52332 };
+
 typedef struct Canvas {
     uint32_t *pixels;
     int width, height, scale;

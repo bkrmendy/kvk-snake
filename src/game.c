@@ -6,11 +6,18 @@
 enum { INITIAL_MOVE_MS = 70, MIN_MOVE_MS = 30, FLASH_MS = 60,
        COLLISION_FLASH_MS = 180, COLLISION_FLASHES = 3 };
 
+/* Fenster maps the arrow keys to these indexes. */
+enum { KEY_UP = 17, KEY_DOWN = 18, KEY_RIGHT = 19, KEY_LEFT = 20 };
+
 bool game_init(Game *game, int64_t now) {
     *game = (Game){ .dx = 1, .next_dx = 1, .last_move = now, .move_ms = INITIAL_MOVE_MS };
     game->head = snake_create(BODY_SEGMENTS, GRID_WIDTH, GRID_HEIGHT);
     if (game->head == NULL) return false;
     food_spawn(&game->food, game->head, GRID_WIDTH, GRID_HEIGHT);
+    if (!game->food.active) {
+        game->game_over = true;
+        game->collision_time = now;
+    }
     return true;
 }
 
@@ -22,7 +29,7 @@ bool game_restart(Game *game, int64_t now) {
     return true;
 }
 
-unsigned int game_food_score(const Game *game) {
+static unsigned int game_food_score(const Game *game) {
     return (unsigned int)(INITIAL_MOVE_MS - game->move_ms);
 }
 
@@ -48,10 +55,10 @@ GameResult game_update(Game *game, const int keys[256], int64_t now) {
     if (game->paused) return GAME_RUNNING;
 
     /* Ignore direct reversals so the head cannot turn into its neck. */
-    if (keys[17] && game->dy != 1) { game->next_dx = 0; game->next_dy = -1; }
-    else if (keys[18] && game->dy != -1) { game->next_dx = 0; game->next_dy = 1; }
-    else if (keys[19] && game->dx != -1) { game->next_dx = 1; game->next_dy = 0; }
-    else if (keys[20] && game->dx != 1) { game->next_dx = -1; game->next_dy = 0; }
+    if (keys[KEY_UP] && game->dy != 1) { game->next_dx = 0; game->next_dy = -1; }
+    else if (keys[KEY_DOWN] && game->dy != -1) { game->next_dx = 0; game->next_dy = 1; }
+    else if (keys[KEY_RIGHT] && game->dx != -1) { game->next_dx = 1; game->next_dy = 0; }
+    else if (keys[KEY_LEFT] && game->dx != 1) { game->next_dx = -1; game->next_dy = 0; }
 
     if (now < game->last_move) game->last_move = now;
     if (now - game->last_move >= game->move_ms) {
@@ -61,12 +68,16 @@ GameResult game_update(Game *game, const int keys[256], int64_t now) {
             game->game_over = true;
             game->collision_time = now;
         } else {
-            int ate = snake_move(&game->food, &game->head, game->dx, game->dy, GRID_WIDTH, GRID_HEIGHT);
-            if (ate < 0) return GAME_ERROR;
-            if (ate) {
+            SnakeMoveResult move = snake_move(&game->food, &game->head, game->dx, game->dy, GRID_WIDTH, GRID_HEIGHT);
+            if (move == SNAKE_MOVE_ERROR) return GAME_ERROR;
+            if (move == SNAKE_ATE) {
                 if (game->move_ms > MIN_MOVE_MS) --game->move_ms;
                 game->score += game_food_score(game);
                 game->flash_until = now + FLASH_MS;
+                if (!game->food.active) {
+                    game->game_over = true;
+                    game->collision_time = now;
+                }
             }
         }
         game->last_move = now;
@@ -80,7 +91,7 @@ void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
     bool collision_red = game->game_over && collision_elapsed >= 0 &&
                          collision_elapsed < COLLISION_FLASHES * 2 * COLLISION_FLASH_MS &&
                          (collision_elapsed / COLLISION_FLASH_MS) % 2 == 0;
-    draw_rectangle(canvas, 0, 0, WIDTH, HEIGHT, collision_red ? 0xa52332 : 0x19243a);
+    draw_rectangle(canvas, 0, 0, WIDTH, HEIGHT, collision_red ? COLOR_COLLISION : 0x19243a);
     if (!collision_red) {
         food_draw(&game->food, canvas, CELL_SIZE);
         snake_draw(game->head, canvas, CELL_SIZE, !game->game_over && now < game->flash_until);

@@ -30,7 +30,6 @@ typedef enum GameResult {
 
 bool game_init(Game *game, int64_t now);
 bool game_restart(Game *game, int64_t now);
-unsigned int game_food_score(const Game *game);
 GameResult game_update(Game *game, const int keys[256], int64_t now);
 void game_draw(const Game *game, const Canvas *canvas, int64_t now);
 void game_destroy(Game *game);

@@ -22,7 +22,7 @@ int main(void) {
     Game game;
     srand((unsigned)time(NULL));
     if (!game_init(&game, fenster_time())) {
-        fputs("Could not allocate snake segment.\n", stderr);
+        fputs("Could not initialize snake (invalid configuration or allocation failure).\n", stderr);
         fenster_close(&window);
         return 1;
     }
