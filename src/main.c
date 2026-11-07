@@ -1,32 +1,16 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include "food.h"
 #include "fenster.h"
 
 enum {
     WIDTH = 160, HEIGHT = 120, SCALE = 4, FRAME_MS = 16,
     CELL_SIZE = 4, GRID_WIDTH = WIDTH / CELL_SIZE, GRID_HEIGHT = HEIGHT / CELL_SIZE,
-    BODY_SEGMENTS = 9, MOVE_MS = 60
+    BODY_SEGMENTS = 9, MOVE_MS = 60, FLASH_MS = 60
 };
 static uint32_t pixels[WIDTH * SCALE * HEIGHT * SCALE];
-
-typedef struct Segment {
-    int x, y; /* Grid coordinates. */
-    struct Segment *next;
-} Segment;
-
-/* Move each segment into the previous position of the segment ahead of it. */
-static void move_snake(Segment *head, int dx, int dy) {
-    int previous_x = head->x, previous_y = head->y;
-    head->x = (head->x + dx + GRID_WIDTH) % GRID_WIDTH;
-    head->y = (head->y + dy + GRID_HEIGHT) % GRID_HEIGHT;
-    for (Segment *segment = head->next; segment != NULL; segment = segment->next) {
-        int x = segment->x, y = segment->y;
-        segment->x = previous_x;
-        segment->y = previous_y;
-        previous_x = x;
-        previous_y = y;
-    }
-}
 
 static void rectangle(int x, int y, int w, int h, uint32_t color) {
     for (int py = y; py < y + h; ++py) {
@@ -49,14 +33,32 @@ int main(void) {
         return 1;
     }
 
-    Segment segments[BODY_SEGMENTS + 1];
-    for (int i = 0; i <= BODY_SEGMENTS; ++i) {
-        segments[i] = (Segment){
+    GridCell *head = NULL;
+    /* Build from tail to head so each node can later be freed independently. */
+    for (int i = BODY_SEGMENTS; i >= 0; --i) {
+        GridCell *segment = malloc(sizeof *segment);
+        if (segment == NULL) {
+            fputs("Could not allocate snake segment.\n", stderr);
+            while (head != NULL) {
+                GridCell *next = head->next;
+                free(head);
+                head = next;
+            }
+            fenster_close(&window);
+            return 1;
+        }
+        *segment = (GridCell){
             .x = (GRID_WIDTH / 2 - i + GRID_WIDTH) % GRID_WIDTH,
             .y = GRID_HEIGHT / 2,
-            .next = i < BODY_SEGMENTS ? &segments[i + 1] : NULL
+            .next = head
         };
+        head = segment;
     }
+    srand((unsigned)time(NULL));
+    Food food = {0};
+    food_spawn(&food, head, GRID_WIDTH, GRID_HEIGHT);
+    int64_t flash_until = 0;
+    int exit_code = 0;
     int dx = 1, dy = 0, next_dx = dx, next_dy = dy;
     int64_t last_move = fenster_time();
     while (fenster_loop(&window) == 0 && !window.keys[27]) {
@@ -71,12 +73,22 @@ int main(void) {
         if (start - last_move >= MOVE_MS) {
             dx = next_dx;
             dy = next_dy;
-            move_snake(&segments[0], dx, dy);
+            int ate = food_move_snake(&food, &head, dx, dy, GRID_WIDTH, GRID_HEIGHT);
+            if (ate < 0) {
+                fputs("Could not grow snake.\n", stderr);
+                exit_code = 1;
+                break;
+            }
+            if (ate) flash_until = start + FLASH_MS;
             last_move = start;
         }
 
-        rectangle(0, 0, WIDTH, HEIGHT, 0x19243a);
-        for (Segment *segment = &segments[0]; segment != NULL; segment = segment->next) {
+        rectangle(0, 0, WIDTH, HEIGHT, start < flash_until ? 0xa52332 : 0x19243a);
+        if (food.active) {
+            rectangle(food.x * CELL_SIZE, food.y * CELL_SIZE,
+                      CELL_SIZE, CELL_SIZE, 0x65d46e);
+        }
+        for (GridCell *segment = head; segment != NULL; segment = segment->next) {
             rectangle(segment->x * CELL_SIZE, segment->y * CELL_SIZE,
                       CELL_SIZE, CELL_SIZE, 0xffd166);
         }
@@ -84,6 +96,11 @@ int main(void) {
         int64_t elapsed = fenster_time() - start;
         if (elapsed >= 0 && elapsed < FRAME_MS) fenster_sleep(FRAME_MS - elapsed);
     }
+    while (head != NULL) {
+        GridCell *next = head->next;
+        free(head);
+        head = next;
+    }
     fenster_close(&window);
-    return 0;
+    return exit_code;
 }
