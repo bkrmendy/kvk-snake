@@ -1,5 +1,6 @@
 #include "game.h"
 #include "snake.h"
+#include "font.h"
 #include <stdlib.h>
 #include <time.h>
 
@@ -52,6 +53,9 @@ void game_draw(const Game *game, const Canvas *canvas, int64_t now) {
     if (!collision_red) {
         food_draw(&game->food, canvas, CELL_SIZE);
         snake_draw(game->head, canvas, CELL_SIZE);
+        draw_rectangle(canvas, 0, GRID_HEIGHT * CELL_SIZE, WIDTH,
+                       HEIGHT - GRID_HEIGHT * CELL_SIZE, 0x3d5675);
+        font_draw_text(canvas, 2, GRID_HEIGHT * CELL_SIZE + 1, "SNAKE", 0xffffff);
     }
 }
 
